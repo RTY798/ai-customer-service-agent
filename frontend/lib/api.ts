@@ -1,3 +1,5 @@
+import { EscalationTicket } from './types'
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
 
 export interface ChatResponse {
@@ -5,12 +7,12 @@ export interface ChatResponse {
   intent: string
   thought_chain: Array<{
     agent: string
-    status: string
+    status: 'running' | 'completed' | 'error'
     input?: string
     output?: string
     detail?: string
   }>
-  escalation_ticket: Record<string, unknown> | null
+  escalation_ticket: EscalationTicket | null
 }
 
 export async function sendMessage(message: string): Promise<ChatResponse> {
