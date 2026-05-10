@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: ai-customer-service-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt && pip install langgraph langchain-community
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://api.deepseek.com/v1
+      - key: LLM_MODEL
+        value: deepseek-chat
