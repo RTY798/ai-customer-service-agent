@@ -2,6 +2,9 @@ import json
 from app.agents.llm_client import call_llm
 from app.data.config import get_data_provider
 from dataclasses import asdict
+from app.util.message_utils import to_llm_messages
+
+TOOL_SYSTEM_PROMPT = """你是电商客服系统的工具调用助手。根据用户的问题，选择合适的工具来获取信息。"""
 
 TOOLS = [
     {
@@ -102,11 +105,24 @@ def _execute_tool(name: str, args: dict) -> str:
 def tool_node(state):
     user_msg = state["user_message"]
 
+    summary = state.get("summary_message", "")
+    full_history = state.get("messages", [])
+
+    llm_messages = [
+        {"role": "system", "content": TOOL_SYSTEM_PROMPT}
+    ]
+
+    if summary:
+        llm_messages.append({
+            "role": "system",
+            "content": f"可参考对话历史摘要回答用户问题，【对话历史摘要】{summary}\n"
+        })
+
+    recent_messages = full_history[-12:] if len(full_history) > 12 else full_history
+    llm_messages += to_llm_messages(recent_messages)
+
     msg = call_llm(
-        messages=[
-            {"role": "system", "content": "你是电商客服系统的工具调用助手。根据用户的问题，选择合适的工具来获取信息。"},
-            {"role": "user", "content": user_msg},
-        ],
+        messages=llm_messages,
         tools=TOOLS,
         tool_choice="auto",
         temperature=0.1,
@@ -139,6 +155,7 @@ def tool_node(state):
 
     existing_thoughts = state.get("thought_chain", [])
     return {
+        "messages": [msg],
         "tool_results": results,
         "thought_chain": existing_thoughts + [thought],
     }

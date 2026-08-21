@@ -1,3 +1,4 @@
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph
 from app.models.schemas import AgentState
 from app.agents.router_agent import router_node, route_decision
@@ -34,7 +35,9 @@ def build_graph() -> StateGraph:
 
     workflow.add_edge("summary", "__end__")
 
-    return workflow.compile()
+    memory = InMemorySaver()
+
+    return workflow.compile(checkpointer=memory)
 
 
 agent_graph = build_graph()

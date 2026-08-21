@@ -1,5 +1,6 @@
 import json
 from app.agents.llm_client import call_llm
+from app.util.message_utils import to_llm_messages
 
 ROUTER_SYSTEM_PROMPT = """你是一个电商智能客服的意图分类器。根据用户的消息，判断其属于以下哪一类：
 
@@ -14,13 +15,27 @@ ROUTER_SYSTEM_PROMPT = """你是一个电商智能客服的意图分类器。根
 
 def router_node(state):
     user_msg = state["user_message"]
+
+    summary = state.get("summary_message", "")
+    full_history = state.get("messages", [])
+
+    llm_messages = [
+        {"role": "system", "content": ROUTER_SYSTEM_PROMPT}
+    ]
+
+    if summary:
+        llm_messages.append({
+            "role": "system",
+            "content": f"可参考对话历史摘要回答用户问题，【对话历史摘要】{summary}\n"
+        })
+
+    recent_messages = full_history[-12:] if len(full_history) > 12 else full_history
+    llm_messages += to_llm_messages(recent_messages)
+
     existing_thoughts = state.get("thought_chain", [])
 
     msg = call_llm(
-        messages=[
-            {"role": "system", "content": ROUTER_SYSTEM_PROMPT},
-            {"role": "user", "content": user_msg},
-        ],
+        messages=llm_messages,
         temperature=0.1,
         response_format={"type": "json_object"},
     )
@@ -38,6 +53,7 @@ def router_node(state):
     }
 
     return {
+        "messages": [msg],
         "intent": intent,
         "thought_chain": existing_thoughts + [thought],
     }
