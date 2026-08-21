@@ -3,9 +3,12 @@ import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from langchain_core.messages import HumanMessage
+
 from app.config import settings
 from app.models.schemas import ChatRequest
 from app.agents.graph import agent_graph
+from app.util.memory import thread_id_cache
 
 app = FastAPI(title="电商智能客服系统", version="1.0.0")
 
@@ -28,13 +31,20 @@ async def chat(req: ChatRequest):
     try:
         initial_state = {
             "user_message": req.message,
-            "messages": [],
+            "user_id": req.user_id,
+            "messages": [HumanMessage(req.message)],
             "thought_chain": [],
             "retrieved_docs": [],
             "tool_results": [],
         }
 
-        result = agent_graph.invoke(initial_state)
+        # 1. 根据 userId 获取或生成 thread_id
+        thread_id = thread_id_cache.get_or_create(initial_state["user_id"])
+        config = {"configurable": {"thread_id": thread_id}}
+
+        result = agent_graph.invoke(initial_state, config=config)
+
+        print("messages====>", result["messages"])
 
         return {
             "reply": result.get("final_response", ""),

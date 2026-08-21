@@ -10,8 +10,12 @@
 """
 
 import sys
-from app.agents.graph import agent_graph
 
+from langchain_core.messages import HumanMessage
+
+from app.agents.graph import agent_graph
+from app.util.memory import thread_id_cache
+import random
 
 BANNER = """
 ╔══════════════════════════════════════════╗
@@ -26,6 +30,8 @@ BANNER = """
 
 def main():
     print(BANNER)
+    # 随机生成user_id
+    user_id = random.randint(1000, 9999)
 
     while True:
         try:
@@ -51,13 +57,23 @@ def main():
             print()
             continue
 
-        result = agent_graph.invoke({
+        initial_state = {
             "user_message": user_input,
-            "messages": [],
+            "user_id": user_id,
+            "messages": [HumanMessage(user_input)],
             "thought_chain": [],
             "retrieved_docs": [],
             "tool_results": [],
-        })
+        }
+
+        thread_id = thread_id_cache.get_or_create(initial_state["user_id"])
+        config = {"configurable": {"thread_id": thread_id}}
+        result = agent_graph.invoke(initial_state, config=config)
+
+        # 测试代码
+        print("result[messages]长度:", len(result["messages"]))
+        for msg in result["messages"]:
+            print(type(msg), msg.content)
 
         reply = result.get("final_response", "")
         print(f"\n  Agent: {reply}")

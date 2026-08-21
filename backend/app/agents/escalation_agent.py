@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from app.agents.llm_client import call_llm
+from app.util.message_utils import to_llm_messages
 
 ESCALATION_PROMPT = """你是一个电商客服升级处理专员。用户的问题需要转接人工客服处理。
 请分析用户的投诉或复杂问题，生成一个结构化的工单信息。
@@ -18,11 +19,24 @@ ESCALATION_PROMPT = """你是一个电商客服升级处理专员。用户的问
 def escalation_node(state):
     user_msg = state["user_message"]
 
+    summary = state.get("summary_message", [])
+    full_history = state.get("messages", [])
+
+    llm_messages = [
+        {"role": "system", "content": ESCALATION_PROMPT}
+    ]
+
+    if summary:
+        llm_messages.append({
+            "role": "system",
+            "content": f"可参考对话历史摘要回答用户问题，【对话历史摘要】{summary}\n"
+        })
+
+    recent_messages = full_history[-12:] if len(full_history) > 12 else full_history
+    llm_messages += to_llm_messages(recent_messages)
+
     msg = call_llm(
-        messages=[
-            {"role": "system", "content": ESCALATION_PROMPT},
-            {"role": "user", "content": user_msg},
-        ],
+        messages=llm_messages,
         temperature=0.2,
         response_format={"type": "json_object"},
     )
@@ -37,6 +51,7 @@ def escalation_node(state):
     }
 
     thought = {
+        "messages": [msg],
         "agent": "escalation",
         "status": "completed",
         "input": user_msg,
